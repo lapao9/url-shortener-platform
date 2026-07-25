@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment variables (SEGREDOS!)
+.env
+
+# IDEs
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# macOS/Windows lixo
+.DS_Store
+Thumbs.db
