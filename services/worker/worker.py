@@ -34,7 +34,7 @@ redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 running = True
 def shutdown(signum, frame):
-    global running
+    global running#global running serve 
     logger.info("Shutdown signal received, finishing current batch...")
     running = False
 

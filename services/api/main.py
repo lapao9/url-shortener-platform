@@ -46,14 +46,14 @@ def health():
 @app.get("/ready")
 def ready(db: Session = Depends(get_db)):
     try:
-        db.execute(text("SELECT 1"))
-        redis_client.ping()
+        db.execute(text("SELECT 1")) #Testar postgres
+        redis_client.ping() #Testar Redis
         return {"status": "ready"}
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
 
 @app.post("/shorten", response_model=URLResponse)
-def shorten(payload: URLCreate, db: Session = Depends(get_db)):
+def shorten(payload: URLCreate, db: Session = Depends(get_db)) -> URLResponse:
     for _ in range(5):
         code = generate_short_code()
         existing = db.query(models.URL).filter(models.URL.short_code == code).first() #first serve 
@@ -64,8 +64,13 @@ def shorten(payload: URLCreate, db: Session = Depends(get_db)):
 
     url_entry = models.URL(short_code=code, original_url=str(payload.url))
     db.add(url_entry)
-    db.commit()
-    db.refresh(url_entry)
+    try:
+        db.commit()
+        db.refresh(url_entry)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    
 
     redis_client.setex(f"url:{code}", CACHE_TTL, str(payload.url))
 
@@ -78,12 +83,11 @@ def shorten(payload: URLCreate, db: Session = Depends(get_db)):
 @app.get("/{short_code}")
 def redirect(short_code: str, request: Request, 
              db: Session = Depends(get_db)):
-        #Exemplo de chamada:
-        #redirect( "abc123", 
     
     cached = redis_client.get(f"url:{short_code}")
     #cached recebe o valor do redis da url encurtada, se nao tiver no redis, vai ser None
     if cached:
+        #se tiver no redis guardamos em "oiriginal" para depois redirecionar
         original = cached
     else:
         #caso nao tenha no redis, vai buscar no banco de dados
@@ -101,7 +105,7 @@ def redirect(short_code: str, request: Request,
         "short_code": short_code,
         "user_agent": request.headers.get("user-agent", ""),
         "ip_address": request.client.host if request.client else "",
-    } #este é o formato de evento de clique
+    } #este é o formato de evento de clique no redis, que vai ser processado pelo worker
     redis_client.rpush(CLICK_QUEUE, json.dumps(event))
     #json.dumps serve para converter o dicionário em uma string JSON
 
